@@ -7,15 +7,28 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export default function SignIn() {
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
 
-  const handleLogin = async (email) => {
+  const handleLogin = async (email, password) => {
     try {
       setLoading(true);
-      const { error } = await supabase.auth.signInWithOtp({ email });
+      const { data: user, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', email)
+        .limit(1)
+        .single();
       if (error) throw error;
-      setMessage('Check your email for the login link!');
+      if (!user) throw new Error('User not found');
+      const { password: hashedPassword } = user;
+      const { error: signInError } = await supabase.auth.signIn({
+        email,
+        password,
+      });
+      if (signInError) throw signInError;
+      setMessage('Logged in successfully!');
     } catch (error) {
       setMessage(error.error_description || error.message);
     } finally {
@@ -26,7 +39,7 @@ export default function SignIn() {
   return (
     <div style={{ maxWidth: '420px', margin: 'auto', padding: '20px', textAlign: 'center' }}>
       <h2>Sign In</h2>
-      <p>Please enter your email address to receive a sign-in link:</p>
+      <p>Please enter your email address and password to sign in:</p>
       <div>
         <input
           type="email"
@@ -35,18 +48,26 @@ export default function SignIn() {
           onChange={(e) => setEmail(e.target.value)}
           style={{ width: '100%', padding: '8px', marginBottom: '10px' }}
         />
+        <input
+          type="password"
+          placeholder="Your password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          style={{ width: '100%', padding: '8px', marginBottom: '10px' }}
+        />
         <button
           onClick={(e) => {
             e.preventDefault();
-            handleLogin(email);
+            handleLogin(email, password);
           }}
           disabled={loading}
           style={{ width: '100%', padding: '8px' }}
         >
-          {loading ? 'Sending...' : 'Send magic link'}
+          {loading ? 'Logging in...' : 'Log in'}
         </button>
       </div>
       {message && <p style={{ marginTop: '20px' }}>{message}</p>}
+      
     </div>
   );
 }
